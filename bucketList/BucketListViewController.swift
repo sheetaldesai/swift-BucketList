@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import CoreData
 
 struct detailsSender {
     var name:String = String()
@@ -14,7 +15,9 @@ struct detailsSender {
 }
 
 class BucketListViewController: UITableViewController, AddItemTableViewControllerDelegate {
-    var items = ["sleep","eat","watch tv","sleep","eat","party"]
+    var items = [BucketListItem]()
+    
+    let managedObjectContext = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
@@ -25,6 +28,7 @@ class BucketListViewController: UITableViewController, AddItemTableViewControlle
     override func viewDidLoad() {
         super.viewDidLoad()
         print("loaded")
+        fetchAllItems()
         // Do any additional setup after loading the view, typically from a nib.
     }
     
@@ -41,7 +45,7 @@ class BucketListViewController: UITableViewController, AddItemTableViewControlle
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ListItemCell", for: indexPath)
         
-        cell.textLabel?.text = items[indexPath.row]
+        cell.textLabel?.text = items[indexPath.row].item
         return cell
     }
     
@@ -53,8 +57,29 @@ class BucketListViewController: UITableViewController, AddItemTableViewControlle
     }
     
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
+        let item = items[indexPath.row]
+        managedObjectContext.delete(item)
+        do {
+            try managedObjectContext.save()
+            print("Success")
+        } catch {
+            print("\(error)")
+        }
         items.remove(at: indexPath.row)
         tableView.reloadData()
+    }
+    
+    func fetchAllItems() {
+        print("FetchAllItems")
+        let request = NSFetchRequest<NSFetchRequestResult>(entityName: "BucketListItem")
+        do {
+            let results = try (managedObjectContext.fetch(request))
+            print("Got results")
+            items = results as! [BucketListItem]
+        } catch {
+            print("\(error)")
+        }
+
     }
     
     func addItemViewController(_ controller: AddItemTableViewController, didPressCancelButton button: UIBarButtonItem) {
@@ -65,10 +90,17 @@ class BucketListViewController: UITableViewController, AddItemTableViewControlle
     func addItemViewController(_ controller: AddItemTableViewController, didFinishAddingItem item: String, at indexPath: IndexPath?) {
         dismiss(animated: true, completion: nil)
         if let path = indexPath {
-            items[path.row] = item
+            items[path.row].item = item
         }
         else {
-            items.append(item)
+            let i = NSEntityDescription.insertNewObject(forEntityName: "BucketListItem", into: managedObjectContext) as! BucketListItem
+            i.item = item
+            items.append(i)
+        }
+        do {
+            try managedObjectContext.save()
+        } catch {
+            print("\(error)")
         }
         tableView.reloadData()
     }
@@ -84,7 +116,7 @@ class BucketListViewController: UITableViewController, AddItemTableViewControlle
         if segue.identifier == "ItemDetailsSegue" {
             if s.name == "edit" {
                 addItemController.indexPath = s.iPath
-                addItemController.editItem = items[s.iPath!.row]
+                addItemController.editItem = items[s.iPath!.row].item
             }
         }
         
